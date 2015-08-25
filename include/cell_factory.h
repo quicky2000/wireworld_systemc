@@ -28,47 +28,49 @@ namespace wireworld_systemc
   {
   public:
     inline static cell_base * create(sc_module_name p_name,
-                                     const std::vector<wireworld_types::t_coordinates> & p_neighbour_coordinates,
-                                     const wireworld_types::t_cell_state & p_state,
+                                     const std::vector<wireworld_common::wireworld_types::t_coordinates> & p_neighbour_coordinates,
+                                     const wireworld_common::wireworld_types::t_cell_state & p_state,
                                      const unsigned int & p_x,
                                      const unsigned int & p_y,
+                                     wireworld_common::wireworld_gui * p_gui,
                                      unsigned int & p_nb_electron);  
   private:
   };
 
   //----------------------------------------------------------------------------
   cell_base * cell_factory::create(sc_module_name p_name,
-                                   const std::vector<wireworld_types::t_coordinates> & p_neighbour_coordinates,
-                                   const wireworld_types::t_cell_state & p_state,
+                                   const std::vector<wireworld_common::wireworld_types::t_coordinates> & p_neighbour_coordinates,
+                                   const wireworld_common::wireworld_types::t_cell_state & p_state,
                                    const unsigned int & p_x,
                                    const unsigned int & p_y,
+                                   wireworld_common::wireworld_gui * p_gui,
                                    unsigned int & p_nb_electron)
     {
       switch(p_neighbour_coordinates.size())
 	{
 	case 1:
-	  return new cell<1>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_nb_electron);
+	  return new cell<1>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_gui, p_nb_electron);
 	  break;
 	case 2:
-	  return new cell<2>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_nb_electron);
+	  return new cell<2>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_gui, p_nb_electron);
 	  break;
 	case 3:
-	  return new cell<3>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_nb_electron);
+	  return new cell<3>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_gui, p_nb_electron);
 	  break;
 	case 4:
-	  return new cell<4>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_nb_electron);
+	  return new cell<4>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_gui, p_nb_electron);
 	  break;
 	case 5:
-	  return new cell<5>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_nb_electron);
+	  return new cell<5>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_gui, p_nb_electron);
 	  break;
 	case 6:
-	  return new cell<6>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_nb_electron);
+	  return new cell<6>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_gui, p_nb_electron);
 	  break;
 	case 7:
-	  return new cell<7>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_nb_electron);
+	  return new cell<7>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_gui, p_nb_electron);
 	  break;
 	case 8:
-	  return new cell<8>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_nb_electron);
+	  return new cell<8>(p_name, p_neighbour_coordinates, p_state, p_x, p_y, p_gui, p_nb_electron);
 	  break;
 	default:
 	  {

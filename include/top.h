@@ -30,7 +30,8 @@ namespace wireworld_systemc
     top(sc_module_name p_name,
         const std::vector<std::pair<uint32_t,uint32_t> > & p_copper_cells,
         const std::vector<std::pair<uint32_t,uint32_t> > & p_queue_cells,
-        const std::vector<std::pair<uint32_t,uint32_t> > & p_electron_cells);
+        const std::vector<std::pair<uint32_t,uint32_t> > & p_electron_cells,
+	const wireworld_common::wireworld_configuration & p_conf);
   private:
     sc_clock m_clk;
     wireworld m_wireworld;
@@ -40,10 +41,11 @@ namespace wireworld_systemc
   top::top(sc_module_name p_name,
            const std::vector<std::pair<uint32_t,uint32_t> > & p_copper_cells,
            const std::vector<std::pair<uint32_t,uint32_t> > & p_queue_cells,
-           const std::vector<std::pair<uint32_t,uint32_t> > & p_electron_cells):
+           const std::vector<std::pair<uint32_t,uint32_t> > & p_electron_cells,
+	   const wireworld_common::wireworld_configuration & p_conf):
     sc_module(p_name),
     m_clk("clk",10.0,SC_NS,0.5,5.0,SC_NS,true),
-    m_wireworld("wireworld",p_copper_cells,p_queue_cells,p_electron_cells)
+    m_wireworld("wireworld",p_copper_cells,p_queue_cells,p_electron_cells,p_conf)
     {
       m_wireworld.m_clk(m_clk);
     }

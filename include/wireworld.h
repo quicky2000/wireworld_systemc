@@ -20,6 +20,8 @@
 #define WIREWORLD_H
 
 #include "systemc.h"
+#include "wireworld_gui.h"
+#include "wireworld_configuration.h"
 #include "cell_factory.h"
 #include <vector>
 #include <set>
@@ -32,27 +34,32 @@ namespace wireworld_systemc
   public:
     SC_HAS_PROCESS(wireworld);
     inline wireworld(sc_module_name p_name,
-                     const std::vector<wireworld_types::t_coordinates > & p_copper_cells,
-                     const std::vector<wireworld_types::t_coordinates > & p_queue_cells,
-                     const std::vector<wireworld_types::t_coordinates > & p_electron_cells);
+                     const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_copper_cells,
+                     const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_queue_cells,
+                     const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_electron_cells,
+		     const wireworld_common::wireworld_configuration & p_conf);
     inline ~wireworld(void);
     sc_in<bool> m_clk;
   private:
     inline void clk_management(void);
     
 
-    typedef std::map<wireworld_types::t_coordinates,std::vector<wireworld_types::t_coordinates>> t_neighbours;
-    inline void instanciate_cells(const std::vector<wireworld_types::t_coordinates > & p_cells,
-                                  const wireworld_types::t_cell_state & p_state,
+    typedef std::map<wireworld_common::wireworld_types::t_coordinates,std::vector<wireworld_common::wireworld_types::t_coordinates>> t_neighbours;
+    inline void instanciate_cells(const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_cells,
+                                  const wireworld_common::wireworld_types::t_cell_state & p_state,
                                   const t_neighbours & p_neighbours);
 
-    typedef std::map<wireworld_types::t_coordinates,std::pair<cell_base*,sc_signal<bool>*>> t_cell_map;
+    typedef std::map<wireworld_common::wireworld_types::t_coordinates,std::pair<cell_base*,sc_signal<bool>*>> t_cell_map;
     t_cell_map m_cells;
     sc_signal<bool> m_clk_sig;
     sc_trace_file *m_trace_file;
     unsigned int m_nb_electron;
     unsigned int m_nb_queue;
     sc_signal<uint32_t> m_nb_electron_sig;
+    sc_signal<uint32_t> m_generation_sig;
+    uint64_t m_generation;
+    wireworld_common::wireworld_gui m_gui;
+    wireworld_common::wireworld_configuration m_config;
   };
 
   //----------------------------------------------------------------------------
@@ -61,8 +68,17 @@ namespace wireworld_systemc
     m_clk_sig.write(m_clk.read());
     if(!m_clk_sig.read())
       {
-        std::cout << m_nb_electron << "E\t" << m_nb_queue << "Q" << std::endl ;
+	// GUI refresh management
+	if(m_generation >= m_config.get_start_cycle() && !(m_generation % m_config.get_refresh_interval()))
+	  {
+	    std::cout << m_generation << " : " << m_nb_electron << "E\t" << m_nb_queue << "Q" << std::endl ;
+	    m_gui.refresh();
+	    SDL_Delay(m_config.get_display_duration());
+	  }
+
         m_nb_electron_sig.write(m_nb_electron);
+        m_generation_sig.write(m_generation);
+        ++m_generation;
         if(m_nb_electron || m_nb_queue)
           {
             m_nb_queue = m_nb_electron;
@@ -77,15 +93,19 @@ namespace wireworld_systemc
 
   //----------------------------------------------------------------------------
   wireworld::wireworld(sc_module_name p_name,
-                       const std::vector<wireworld_types::t_coordinates > & p_copper_cells,
-                       const std::vector<wireworld_types::t_coordinates > & p_queue_cells,
-                       const std::vector<wireworld_types::t_coordinates > & p_electron_cells
+                       const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_copper_cells,
+                       const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_queue_cells,
+                       const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_electron_cells,
+		       const wireworld_common::wireworld_configuration & p_conf
                        ):
     sc_module(p_name),
     m_clk("clk_in"),
     m_clk_sig("clk"),
     m_trace_file(nullptr),
-    m_nb_electron_sig("nb_electron")
+    m_nb_electron_sig("nb_electron"),
+    m_generation_sig("generation"),
+    m_generation(0),
+    m_config(p_conf)
     {
       m_trace_file = sc_create_vcd_trace_file("trace");
       SC_METHOD(clk_management);
@@ -94,22 +114,29 @@ namespace wireworld_systemc
 
       sc_trace(m_trace_file,m_clk_sig,m_clk_sig.name());
       sc_trace(m_trace_file,m_nb_electron_sig,m_nb_electron_sig.name());
+      sc_trace(m_trace_file,m_generation_sig,m_generation_sig.name());
 
       m_nb_queue = p_queue_cells.size();
       m_nb_electron = p_electron_cells.size();
 
+      uint32_t l_x_max = 0;
+      uint32_t l_y_max = 0;
+
       // Insert copper cells in a set to have a kind of spatial access
-      std::set<wireworld_types::t_coordinates> l_cells;
+      std::set<wireworld_common::wireworld_types::t_coordinates> l_cells;
       for(auto l_iter: p_copper_cells)
         {
-          l_cells.insert(std::set<wireworld_types::t_coordinates>::value_type(l_iter));
+          l_cells.insert(std::set<wireworld_common::wireworld_types::t_coordinates>::value_type(l_iter));
+          // Search for max X and max Y
+          if(l_iter.first > l_x_max) l_x_max = l_iter.first;
+          if(l_iter.second > l_y_max) l_y_max = l_iter.second;
         }
 
       // Cout number of neighbours
       t_neighbours l_neighbours;
       for(auto l_iter:l_cells)
         {
-          t_neighbours::iterator l_neighbour_iter = l_neighbours.insert(t_neighbours::value_type(l_iter,std::vector<wireworld_types::t_coordinates>())).first;
+          t_neighbours::iterator l_neighbour_iter = l_neighbours.insert(t_neighbours::value_type(l_iter,std::vector<wireworld_common::wireworld_types::t_coordinates>())).first;
 
           uint32_t l_x = l_iter.first;
           uint32_t l_y = l_iter.second;
@@ -120,18 +147,21 @@ namespace wireworld_systemc
                 {
                   int l_rel_x = l_x + l_x_index;
                   int l_rel_y = l_y + l_y_index;
-                  if((l_x_index || l_y_index) && l_cells.end() != l_cells.find(wireworld_types::t_coordinates(l_rel_x,l_rel_y)))
+                  if((l_x_index || l_y_index) && l_cells.end() != l_cells.find(wireworld_common::wireworld_types::t_coordinates(l_rel_x,l_rel_y)))
                     {
-                      l_neighbour_iter->second.push_back(wireworld_types::t_coordinates(l_rel_x,l_rel_y));
+                      l_neighbour_iter->second.push_back(wireworld_common::wireworld_types::t_coordinates(l_rel_x,l_rel_y));
                     }
                 }
             }
         }
 
+      // Create GUI
+      m_gui.createWindow(l_x_max + 2,l_y_max + 2);
+
       // Instanciate cells
-      instanciate_cells(p_electron_cells,wireworld_types::t_cell_state::ELECTRON,l_neighbours);
-      instanciate_cells(p_queue_cells,wireworld_types::t_cell_state::QUEUE,l_neighbours);
-      instanciate_cells(p_copper_cells,wireworld_types::t_cell_state::COPPER,l_neighbours);
+      instanciate_cells(p_electron_cells,wireworld_common::wireworld_types::t_cell_state::ELECTRON,l_neighbours);
+      instanciate_cells(p_queue_cells,wireworld_common::wireworld_types::t_cell_state::QUEUE,l_neighbours);
+      instanciate_cells(p_copper_cells,wireworld_common::wireworld_types::t_cell_state::COPPER,l_neighbours);
 
       // Bind cells
       for(auto l_iter: p_copper_cells)
@@ -161,11 +191,12 @@ namespace wireworld_systemc
               ++l_index;
             }
         }
+      m_gui.refresh();
     }
 
   //----------------------------------------------------------------------------
-  void wireworld::instanciate_cells(const std::vector<wireworld_types::t_coordinates > & p_cells,
-                                    const wireworld_types::t_cell_state & p_state,
+  void wireworld::instanciate_cells(const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_cells,
+                                    const wireworld_common::wireworld_types::t_cell_state & p_state,
                                     const wireworld::t_neighbours & p_neighbours)
   {
     for(auto l_iter:p_cells)
@@ -185,10 +216,11 @@ namespace wireworld_systemc
                                                                                                               p_state,
                                                                                                               l_iter.first,
                                                                                                               l_iter.second,
+                                                                                                              &m_gui,
                                                                                                               m_nb_electron
                                                                                                               ),
                                                                                          new sc_signal<bool>(l_name.c_str(),
-                                                                                                             wireworld_types::t_cell_state::ELECTRON == p_state
+                                                                                                             wireworld_common::wireworld_types::t_cell_state::ELECTRON == p_state
                                                                                                              )
                                                                                          )
                                                   )

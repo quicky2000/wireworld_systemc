@@ -1,3 +1,3 @@
-depend:EXT_systemc simple_gui parameter_manager
+depend:EXT_systemc wireworld_common
 CFLAGS:-Wall -ansi -pedantic -g -std=c++11 -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -O3 -DNDEBUG
 LDFLAGS:

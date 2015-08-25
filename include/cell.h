@@ -23,6 +23,7 @@
 #include "wireworld_types.h"
 #include "cell_base.h"
 #include "quicky_exception.h"
+#include "wireworld_gui.h"
 #include <vector>
 #include <string>
 #include <sstream>
@@ -36,11 +37,12 @@ namespace wireworld_systemc
   public:
     SC_HAS_PROCESS(cell);
     inline cell(sc_module_name p_name,
-		const std::vector<wireworld_types::t_coordinates> & p_neighbour_coordinates,
-                const wireworld_types::t_cell_state & p_state,
+		const std::vector<wireworld_common::wireworld_types::t_coordinates> & p_neighbour_coordinates,
+                const wireworld_common::wireworld_types::t_cell_state & p_state,
                 const unsigned int & p_x,
                 const unsigned int & p_y,
-                unsigned int & p_nb_electron);
+                wireworld_common::wireworld_gui * p_gui,
+               unsigned int & p_nb_electron);
 
     // Virtual methods to implement
     inline void bind_clk(sc_signal<bool> & p_clk);
@@ -55,9 +57,10 @@ namespace wireworld_systemc
     
     inline void run(void);
   private:
-    wireworld_types::t_cell_state m_state;
+    wireworld_common::wireworld_types::t_cell_state m_state;
     const unsigned int m_x;
     const unsigned int m_y;
+    wireworld_common::wireworld_gui * m_gui;
     unsigned int & m_nb_electron;
   };
 
@@ -65,10 +68,11 @@ namespace wireworld_systemc
   //----------------------------------------------------------------------------
   template <unsigned int SIZE>
     cell<SIZE>::cell(sc_module_name p_name,
-		     const std::vector<wireworld_types::t_coordinates> & p_neighbour_coordinates,
-                     const wireworld_types::t_cell_state & p_state,
+		     const std::vector<wireworld_common::wireworld_types::t_coordinates> & p_neighbour_coordinates,
+                     const wireworld_common::wireworld_types::t_cell_state & p_state,
                      const unsigned int & p_x,
                      const unsigned int & p_y,
+                     wireworld_common::wireworld_gui * p_gui,
                      unsigned int & p_nb_electron):
     sc_module(p_name),
     m_clk("clk"),
@@ -76,6 +80,7 @@ namespace wireworld_systemc
     m_state(p_state),
     m_x(p_x),
     m_y(p_y),
+    m_gui(p_gui),
     m_nb_electron(p_nb_electron)
     {
       assert(SIZE == p_neighbour_coordinates.size());
@@ -87,6 +92,8 @@ namespace wireworld_systemc
 	  m_neighbours[l_index] = new sc_in<bool>(l_stream.str().c_str());
           ++l_index;
 	}
+
+      if(m_gui) m_gui->displayCell(m_x,m_y,m_state);
 
       SC_METHOD(run);
       dont_initialize();
@@ -130,7 +137,7 @@ namespace wireworld_systemc
     {
       switch(m_state)
 	{
-	case wireworld_types::t_cell_state::COPPER:
+	case wireworld_common::wireworld_types::t_cell_state::COPPER:
 	  {
 	    unsigned int l_total = 0;
 	    for(unsigned int l_index = 0 ; l_index < SIZE ; ++l_index)
@@ -140,20 +147,23 @@ namespace wireworld_systemc
 	    if(l_total && l_total < 3)
 	      {
 		m_electron.write(1);
-		m_state = wireworld_types::t_cell_state::ELECTRON;
+		m_state = wireworld_common::wireworld_types::t_cell_state::ELECTRON;
+                if(m_gui) m_gui->displayElectron(m_x,m_y);
                 ++m_nb_electron;
-                std::cout << "Cell(" << m_x << "," << m_y << ") switch to " << wireworld_types::cell_state2string(m_state) << " @" << sc_time_stamp() << std::endl ;
+                std::cout << "Cell(" << m_x << "," << m_y << ") switch to " << wireworld_common::wireworld_types::cell_state2string(m_state) << " @" << sc_time_stamp() << std::endl ;
 	      }
 	  }
 	  break;
-	case wireworld_types::t_cell_state::QUEUE:
-	  m_state = wireworld_types::t_cell_state::COPPER;
-          std::cout << "Cell(" << m_x << "," << m_y << ") switch to " << wireworld_types::cell_state2string(m_state) << " @" << sc_time_stamp()  << std::endl ;
+	case wireworld_common::wireworld_types::t_cell_state::QUEUE:
+	  m_state = wireworld_common::wireworld_types::t_cell_state::COPPER;
+          if(m_gui) m_gui->displayCopper(m_x,m_y);
+          std::cout << "Cell(" << m_x << "," << m_y << ") switch to " << wireworld_common::wireworld_types::cell_state2string(m_state) << " @" << sc_time_stamp()  << std::endl ;
 	  break;
-	case wireworld_types::t_cell_state::ELECTRON:
+	case wireworld_common::wireworld_types::t_cell_state::ELECTRON:
 	  m_electron.write(0);
-	  m_state = wireworld_types::t_cell_state::QUEUE;
-          std::cout << "Cell(" << m_x << "," << m_y << ") switch to " << wireworld_types::cell_state2string(m_state) << " @" << sc_time_stamp()  << std::endl ;
+	  m_state = wireworld_common::wireworld_types::t_cell_state::QUEUE;
+          if(m_gui) m_gui->displayQueue(m_x,m_y);
+          std::cout << "Cell(" << m_x << "," << m_y << ") switch to " << wireworld_common::wireworld_types::cell_state2string(m_state) << " @" << sc_time_stamp()  << std::endl ;
 	  break;
         default:
 	  {
