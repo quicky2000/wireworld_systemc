@@ -23,13 +23,14 @@
 #include "wireworld_gui.h"
 #include "wireworld_configuration.h"
 #include "cell_factory.h"
+#include "signal_handler.h"
 #include <vector>
 #include <set>
 #include <map>
 
 namespace wireworld_systemc
 {
-  class wireworld: public sc_module
+  class wireworld: public sc_module, public quicky_utils::signal_handler_listener_if
   {
   public:
     SC_HAS_PROCESS(wireworld);
@@ -39,6 +40,10 @@ namespace wireworld_systemc
                      const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_electron_cells,
 		     const wireworld_common::wireworld_configuration & p_conf);
     inline ~wireworld(void);
+
+    // Method inherited from signal_handler_listener_if
+    inline void handle(int p_signal);
+    // End of method inherited from signal_handler_listener_if
     sc_in<bool> m_clk;
   private:
     inline void clk_management(void);
@@ -60,6 +65,8 @@ namespace wireworld_systemc
     uint64_t m_generation;
     wireworld_common::wireworld_gui m_gui;
     wireworld_common::wireworld_configuration m_config;
+    bool m_stop;
+    quicky_utils::signal_handler m_signal_handler;
   };
 
   //----------------------------------------------------------------------------
@@ -79,7 +86,7 @@ namespace wireworld_systemc
         m_nb_electron_sig.write(m_nb_electron);
         m_generation_sig.write(m_generation);
         ++m_generation;
-        if(m_nb_electron || m_nb_queue)
+        if(!m_stop && (m_nb_electron || m_nb_queue))
           {
             m_nb_queue = m_nb_electron;
             m_nb_electron = 0;
@@ -90,6 +97,13 @@ namespace wireworld_systemc
           }
       }
   }
+
+  //----------------------------------------------------------------------------
+  void wireworld::handle(int p_signal)
+    {
+      std::cout << "STOP requested !" << std::endl ;
+      m_stop = true;
+    }
 
   //----------------------------------------------------------------------------
   wireworld::wireworld(sc_module_name p_name,
@@ -105,7 +119,9 @@ namespace wireworld_systemc
     m_nb_electron_sig("nb_electron"),
     m_generation_sig("generation"),
     m_generation(0),
-    m_config(p_conf)
+    m_config(p_conf),
+    m_stop(false),
+    m_signal_handler(*this)
     {
       m_trace_file = sc_create_vcd_trace_file("trace");
       SC_METHOD(clk_management);
