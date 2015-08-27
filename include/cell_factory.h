@@ -76,7 +76,11 @@ namespace wireworld_systemc
 	  {
 	    std::stringstream l_stream;
 	    l_stream << p_neighbour_coordinates.size();
-	    throw quicky_exception::quicky_logic_exception("Unsupported number of neighbour "+l_stream.str(),__LINE__,__FILE__);
+	    std::stringstream l_x_stream;
+	    l_x_stream << p_x;
+	    std::stringstream l_y_stream;
+	    l_y_stream << p_y;
+	    throw quicky_exception::quicky_logic_exception("Unsupported number of neighbour "+l_stream.str()+" for cell located in ("+l_x_stream.str()+","+l_y_stream.str()+")",__LINE__,__FILE__);
 	  }
 	}
     }
