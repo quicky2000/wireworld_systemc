@@ -88,7 +88,7 @@ namespace wireworld_systemc
         m_nb_electron_sig.write(m_nb_electron);
         m_generation_sig.write(m_generation);
         ++m_generation;
-        if(!m_stop && (m_nb_electron || m_nb_queue))
+        if(!m_stop && (m_nb_electron || m_nb_queue) && m_generation <= m_config.get_nb_max_cycle())
           {
             m_nb_queue = m_nb_electron;
             m_nb_electron = 0;
