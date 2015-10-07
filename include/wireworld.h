@@ -78,7 +78,9 @@ namespace wireworld_systemc
 	// GUI refresh management
 	if(m_generation >= m_config.get_start_cycle() && !(m_generation % m_config.get_refresh_interval()))
 	  {
+#ifdef DEBUG_MESSAGES
 	    std::cout << m_generation << " : " << m_nb_electron << "E\t" << m_nb_queue << "Q" << std::endl ;
+#endif // DEBUG_MESSAGES
 	    m_gui.refresh();
 	    SDL_Delay(m_config.get_display_duration());
 	  }
