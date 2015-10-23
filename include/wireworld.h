@@ -255,7 +255,11 @@ namespace wireworld_systemc
           // Bind unique clock signal and electron signals
           l_cell_iter->second.first->bind_clk(m_clk_sig);
           l_cell_iter->second.first->bind_electron(*(l_cell_iter->second.second));
-          sc_trace(m_trace_file,*(l_cell_iter->second.second),l_cell_iter->second.second->name());
+
+	  if(p_conf.get_trace() && l_iter.first >= p_conf.get_trace_x_origin() && l_iter.first < (p_conf.get_trace_x_origin() + p_conf.get_trace_width()) && l_iter.second >= p_conf.get_trace_y_origin() && l_iter.second < (p_conf.get_trace_y_origin() + p_conf.get_trace_height()))
+	    {
+	      sc_trace(m_trace_file,*(l_cell_iter->second.second),l_cell_iter->second.second->name());
+	    }
 
           // Search for neighbours coordinates
           t_neighbours::const_iterator l_neighbour_list_iter = l_neighbours.find(l_iter);
