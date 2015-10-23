@@ -27,6 +27,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <queue>
 
 namespace wireworld_systemc
 {
@@ -54,6 +55,12 @@ namespace wireworld_systemc
                                   const wireworld_common::wireworld_types::t_cell_state & p_state,
                                   const t_neighbours & p_neighbours);
 
+    typedef unsigned int t_partition_id;
+    typedef std::set<t_partition_id> t_active_partitions;
+    typedef std::map<wireworld_common::wireworld_types::t_coordinates,t_partition_id> t_partitionned_cells;
+    inline void compute_active_partitions(const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_cells,
+					  const t_partitionned_cells & p_partitionned_cells,
+					  t_active_partitions & p_active_partitions);
     typedef std::map<wireworld_common::wireworld_types::t_coordinates,std::pair<cell_base*,sc_signal<bool>*>> t_cell_map;
     t_cell_map m_cells;
     sc_signal<bool> m_clk_sig;
@@ -125,6 +132,9 @@ namespace wireworld_systemc
     m_stop(false),
     m_signal_handler(*this)
     {
+
+      std::cout << "Number of cells in design : " << p_copper_cells.size() << std::endl ;
+
       m_trace_file = sc_create_vcd_trace_file("trace");
       SC_METHOD(clk_management);
       dont_initialize();
@@ -141,10 +151,10 @@ namespace wireworld_systemc
       uint32_t l_y_max = 0;
 
       // Insert copper cells in a set to have a kind of spatial access
-      std::set<wireworld_common::wireworld_types::t_coordinates> l_cells;
+      t_partitionned_cells l_cells;
       for(auto l_iter: p_copper_cells)
         {
-          l_cells.insert(std::set<wireworld_common::wireworld_types::t_coordinates>::value_type(l_iter));
+          l_cells.insert(t_partitionned_cells::value_type(l_iter,0));
           // Search for max X and max Y
           if(l_iter.first > l_x_max) l_x_max = l_iter.first;
           if(l_iter.second > l_y_max) l_y_max = l_iter.second;
@@ -154,10 +164,10 @@ namespace wireworld_systemc
       t_neighbours l_neighbours;
       for(auto l_iter:l_cells)
         {
-          t_neighbours::iterator l_neighbour_iter = l_neighbours.insert(t_neighbours::value_type(l_iter,std::vector<wireworld_common::wireworld_types::t_coordinates>())).first;
+          t_neighbours::iterator l_neighbour_iter = l_neighbours.insert(t_neighbours::value_type(l_iter.first,std::vector<wireworld_common::wireworld_types::t_coordinates>())).first;
 
-          uint32_t l_x = l_iter.first;
-          uint32_t l_y = l_iter.second;
+          uint32_t l_x = l_iter.first.first;
+          uint32_t l_y = l_iter.first.second;
 
           for(int l_y_index = -1 ; l_y_index < 2 ; ++l_y_index)
             {
@@ -173,16 +183,70 @@ namespace wireworld_systemc
             }
         }
 
+      // Compute partitions
+      t_partition_id l_next_partition_id = 1;
+      for(auto l_iter:l_cells)
+	{
+	  // Check if current cell is already in a partition
+	  if(!l_iter.second)
+	    {
+	      l_iter.second = l_next_partition_id;
+	      // Extend partition to neighbours
+	      std::queue<wireworld_common::wireworld_types::t_coordinates> l_partition_neighbours;
+	      l_partition_neighbours.push(l_iter.first);
+	      while(l_partition_neighbours.size())
+		{
+		  t_neighbours::const_iterator l_neighbours_iter = l_neighbours.find(l_partition_neighbours.front());
+		  assert(l_neighbours.end() != l_neighbours_iter);
+		  for(auto l_neighbour_iter : l_neighbours_iter->second)
+		    {
+		      t_partitionned_cells::iterator l_neighbour_cell_iter = l_cells.find(l_neighbour_iter);
+		      assert(l_cells.end() != l_neighbour_cell_iter);
+		      if(!l_neighbour_cell_iter->second)
+			{
+			  l_neighbour_cell_iter->second = l_next_partition_id;
+			  l_partition_neighbours.push(l_neighbour_cell_iter->first);
+			}
+		    }
+		  l_partition_neighbours.pop();
+		}
+	      ++l_next_partition_id;
+	    }
+	}
+      std::cout << "Number of partitions : " << l_next_partition_id - 1 << std::endl ;
+
+      // Determine active partitions
+      t_active_partitions l_active_partitions;
+      compute_active_partitions(p_electron_cells,l_cells,l_active_partitions);
+      compute_active_partitions(p_queue_cells,l_cells,l_active_partitions);
+      std::cout << "Number of active partitions : " << l_active_partitions.size() << std::endl ;
+
       // Create GUI
       m_gui.createWindow(l_x_max + 2,l_y_max + 2);
 
       // Instanciate cells
       instanciate_cells(p_electron_cells,wireworld_common::wireworld_types::t_cell_state::ELECTRON,l_neighbours);
       instanciate_cells(p_queue_cells,wireworld_common::wireworld_types::t_cell_state::QUEUE,l_neighbours);
-      instanciate_cells(p_copper_cells,wireworld_common::wireworld_types::t_cell_state::COPPER,l_neighbours);
+
+      std::vector<wireworld_common::wireworld_types::t_coordinates > l_copper_cells;
+      for(auto l_iter:p_copper_cells)
+	{
+	  t_partitionned_cells::iterator l_cell_iter = l_cells.find(l_iter);
+	  assert(l_cells.end() != l_cell_iter);
+	  if(l_active_partitions.end() != l_active_partitions.find(l_cell_iter->second))
+	    {
+	      l_copper_cells.push_back(l_iter);
+	    }
+	  else
+	    {
+	      m_gui.displayCell(l_iter.first,l_iter.second,wireworld_common::wireworld_types::t_cell_state::COPPER);
+	    }
+	}
+
+      instanciate_cells(l_copper_cells,wireworld_common::wireworld_types::t_cell_state::COPPER,l_neighbours);
 
       // Bind cells
-      for(auto l_iter: p_copper_cells)
+      for(auto l_iter: l_copper_cells)
         {
           // Find cell
           t_cell_map::iterator l_cell_iter = m_cells.find(l_iter);
@@ -209,6 +273,7 @@ namespace wireworld_systemc
               ++l_index;
             }
         }
+      std::cout << "Number of cells instanciated : " << m_cells.size() << std::endl;
       m_gui.refresh();
     }
 
@@ -244,6 +309,23 @@ namespace wireworld_systemc
                                                   )
                            );
           }
+      }
+  }
+
+  //----------------------------------------------------------------------------
+  void wireworld::compute_active_partitions(const std::vector<wireworld_common::wireworld_types::t_coordinates > & p_cells,
+					    const t_partitionned_cells & p_partitionned_cells,
+					    t_active_partitions & p_active_partitions)
+  {
+    for(auto l_iter : p_cells)
+      {
+	t_partitionned_cells::const_iterator l_cell_iter = p_partitionned_cells.find(l_iter);
+	assert(p_partitionned_cells.end() != l_cell_iter);
+	t_partition_id l_partition_id = l_cell_iter->second;
+	if(p_active_partitions.end() == p_active_partitions.find(l_partition_id))
+	  {
+	    p_active_partitions.insert(l_partition_id);
+	  }
       }
   }
 
