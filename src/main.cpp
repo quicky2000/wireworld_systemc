@@ -15,10 +15,10 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
+#include "wireworld_prepare.h"
 #include "wireworld_parameters.h"
-#include "wireworld_parser.h"
-#include "wireworld_analyzer.h"
 #include "wireworld_types.h"
+#include "wireworld_configuration.h"
 #include "top.h"
 
 int sc_main(int argc,char ** argv)
@@ -26,20 +26,23 @@ int sc_main(int argc,char ** argv)
   try
     {
       wireworld_common::wireworld_configuration l_config;
-      wireworld_common::wireworld_parameters::configure(argc,argv,l_config);
-
-      wireworld_common::wireworld_types::t_cell_list l_raw_copper_cells;
+      wireworld_common::wireworld_types::t_cell_list l_copper_cells;
       wireworld_common::wireworld_types::t_cell_list l_queue_cells;
       wireworld_common::wireworld_types::t_cell_list l_electron_cells;
-
-      wireworld_common::wireworld_parser::parse(l_config.get_input_file_name(),l_raw_copper_cells,l_queue_cells,l_electron_cells);
-
-      uint32_t l_x_max = 0;
-      uint32_t l_y_max = 0;
-      wireworld_common::wireworld_types::t_cell_list l_copper_cells;
       wireworld_common::wireworld_types::t_cell_list l_inactive_cells;
       wireworld_common::wireworld_types::t_neighbours l_neighbours;
-      wireworld_common::wireworld_analyzer::analyze(l_raw_copper_cells,l_queue_cells,l_electron_cells,l_x_max,l_y_max,l_copper_cells,l_inactive_cells,l_neighbours);
+      uint32_t l_x_max = 0;
+      uint32_t l_y_max = 0;
+
+      wireworld_common::wireworld_prepare::prepare(argc,argv,
+						   l_config,
+						   l_copper_cells,
+						   l_queue_cells,
+						   l_electron_cells,
+						   l_inactive_cells,
+						   l_neighbours,
+						   l_x_max,
+						   l_y_max);
 
       wireworld_systemc::top l_top("top",l_copper_cells,l_queue_cells,l_electron_cells,l_config,l_x_max,l_y_max,l_inactive_cells,l_neighbours);
       sc_start();
